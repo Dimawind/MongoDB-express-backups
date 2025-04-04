@@ -1,0 +1,55 @@
+services:
+  mongo:
+    image: mongo:8.0.6-noble
+    container_name: ${MONGO_DB_HOST}
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${ROOT_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${ROOT_PASS}
+    ports:
+      - "${MONGO_DB_PORT}:27017"
+    volumes:
+      - ./mongo_data:/data/db
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50' # 25% CPU
+          memory: 1G # 1 gb ОЗУ
+
+  mongo-express:
+    image: mongo-express:1.0.2-20-alpine3.19
+    container_name: mongo-express
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: ${ROOT_USER}
+      ME_CONFIG_MONGODB_ADMINPASSWORD: ${ROOT_PASS}
+      ME_CONFIG_MONGODB_URL: mongodb://${ROOT_USER}:${ROOT_PASS}@${MONGO_DB_HOST}:${MONGO_DB_PORT}/
+      ME_CONFIG_BASICAUTH: true # Включаем базовую аутентификацию
+      ME_CONFIG_BASICAUTH_USERNAME: ${EXP_USER}
+      ME_CONFIG_BASICAUTH_PASSWORD: ${EXP_PASS}
+    ports:
+      - "${EXP_PORT}:8081"
+    depends_on:
+      - mongo
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50' # 25% CPU
+          memory: 512M # 512 мегабайт ОЗУ
+
+
+  backup:
+    image: alpine:3.21.3  # Используем легковесный образ Alpine
+    container_name: mongo-backup
+    volumes:
+      - ./mongo_data:/data/db  # Указываем тот же volume для доступа к данным
+      - ./backups:/backups    # Локальная директория для сохранения бэкапов
+    entrypoint: /bin/sh -c "echo starting backup... && while true; do sh /backups/backup.sh; sleep 60; done"  # Устанавливаем mongodb-tools и запускаем 86400 бесконечный цикл
+    depends_on:
+      - mongo
+
+
+volumes:
+  mongo_data:
+    driver_opts:
+      o: "size=1000m"
+
+
